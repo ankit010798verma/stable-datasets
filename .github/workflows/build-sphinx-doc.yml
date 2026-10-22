@@ -4,9 +4,17 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
+
+concurrency:
+  # A new push to a PR cancels that PR's previous run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build_docs:
@@ -14,10 +22,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+        with:
+          # The PR check diffs GitHub's merge commit against its first parent (main).
+          fetch-depth: 2
 
       - name: Set up Python
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
@@ -37,7 +48,13 @@ jobs:
       - name: Build Sphinx HTML documentation
         run: |
           cd docs
-          sphinx-build -b dirhtml source/ build/
+          sphinx-build -b dirhtml source/ build/ -w ../docs-warnings.txt
+
+      # main still has older warnings, so PRs only fail on warnings from files they changed.
+      # Once main builds cleanly, add -W to sphinx-build above and drop this step.
+      - name: Fail on docs warnings from files this PR changed
+        if: github.event_name == 'pull_request'
+        run: python .github/scripts/check_docs_warnings.py docs-warnings.txt --base HEAD^1
 
       - name: Upload documentation artifact
         uses: actions/upload-artifact@v4
@@ -46,7 +63,8 @@ jobs:
           path: docs/build/
 
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+        if: github.event_name == 'push'
+        uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./docs/build/

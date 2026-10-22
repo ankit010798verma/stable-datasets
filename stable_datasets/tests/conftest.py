@@ -20,9 +20,13 @@ if str(project_root) not in sys.path:
 
 
 def _stable_datasets_cache_dirs():
-    """Default cache dirs used by dataset builders (downloads + processed)."""
-    base = Path(os.path.expanduser("~/.stable_datasets"))
-    return [base / "downloads", base / "processed"]
+    """Default cache dirs used by dataset builders (downloads + processed).
+
+    Asks the library, so the cleanup follows ``STABLE_DATASETS_CACHE_DIR`` when it is set.
+    """
+    from stable_datasets.utils import _default_dest_folder, _default_processed_cache_dir
+
+    return [_default_dest_folder(), _default_processed_cache_dir()]
 
 
 @pytest.fixture(autouse=True, scope="function")
