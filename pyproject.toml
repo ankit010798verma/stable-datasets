@@ -46,7 +46,8 @@ benchmarks = [
     "psutil",
     "datasets",
     "torchvision",
-    "stable-pretraining @ git+https://github.com/galilai-group/stable-pretraining",
+    # Pinned because upstream renames APIs between patch releases; Dependabot opens a PR for each new release.
+    "stable-pretraining==0.1.8",
     "hydra-core>=1.3",
     "hydra-submitit-launcher>=1.2",
     "hydra-joblib-launcher>=1.2",
