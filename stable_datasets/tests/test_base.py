@@ -798,6 +798,100 @@ def test_download_raises_aggregated_error_when_all_candidates_fail(tmp_path):
                 download(primary, dest_folder=dest_folder, progress_bar=False, fallbacks=[fallback])
 
 
+def _flaky_session(failures, content=b"payload"):
+    """A fake ``requests.Session`` whose ``get`` raises each error in *failures* in turn, then succeeds."""
+    failures = list(failures)
+    seen = []
+
+    class FakeResponse:
+        status_code = 200
+        headers = {"content-length": str(len(content))}
+
+        def raise_for_status(self):
+            pass
+
+        def iter_content(self, chunk_size=8192):
+            return iter([content])
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+    class FakeSession:
+        def __init__(self):
+            self.headers = {}
+
+        def get(self, url, **kwargs):
+            seen.append(url)
+            if failures:
+                raise failures.pop(0)
+            return FakeResponse()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+    return FakeSession(), seen
+
+
+def _http_error(status):
+    import requests
+
+    response = MagicMock(status_code=status)
+    return requests.HTTPError(f"{status} error", response=response)
+
+
+def test_download_retries_network_errors(tmp_path, monkeypatch):
+    import requests
+
+    monkeypatch.setattr(utils, "DOWNLOAD_RETRY_WAITS", (0, 0, 0))
+    url = "https://flaky.example.com/file.bin"
+    session, seen = _flaky_session([requests.ConnectTimeout("timed out"), _http_error(503)])
+
+    with patch("stable_datasets.utils.requests.Session", return_value=session):
+        with patch("stable_datasets.utils.FileLock"):
+            result = utils.download(url, dest_folder=tmp_path, progress_bar=False)
+
+    assert seen == [url, url, url]
+    assert result.read_bytes() == b"payload"
+
+
+def test_download_does_not_retry_http_404(tmp_path, monkeypatch):
+    monkeypatch.setattr(utils, "DOWNLOAD_RETRY_WAITS", (0, 0, 0))
+    url = "https://moved.example.com/file.bin"
+    session, seen = _flaky_session([_http_error(404)])
+
+    with patch("stable_datasets.utils.requests.Session", return_value=session):
+        with patch("stable_datasets.utils.FileLock"):
+            with pytest.raises(RuntimeError, match="Failed to download from all candidate URLs") as excinfo:
+                utils.download(url, dest_folder=tmp_path, progress_bar=False)
+
+    assert seen == [url]
+    # A 404 means the URL is wrong, not that the host is down.
+    assert not isinstance(excinfo.value, utils.HostUnreachableError)
+
+
+def test_download_raises_host_unreachable_when_every_candidate_has_network_errors(tmp_path, monkeypatch):
+    import requests
+
+    monkeypatch.setattr(utils, "DOWNLOAD_RETRY_WAITS", (0, 0, 0))
+    primary = "https://down.example.com/file.bin"
+    fallback = "https://also-down.example.com/file.bin"
+    session, seen = _flaky_session([requests.ConnectionError("no route")] * 8)
+
+    with patch("stable_datasets.utils.requests.Session", return_value=session):
+        with patch("stable_datasets.utils.FileLock"):
+            with pytest.raises(utils.HostUnreachableError, match="Failed to download from all candidate URLs"):
+                utils.download(primary, dest_folder=tmp_path, progress_bar=False, fallbacks=[fallback])
+
+    # One try plus one retry per wait, for each candidate URL.
+    assert seen == [primary] * 4 + [fallback] * 4
+
+
 def test_download_validates_checksum_on_fallback(tmp_path):
     from stable_datasets.utils import download
 
