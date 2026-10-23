@@ -198,13 +198,13 @@ jobs:
           print(f'Merged {len(merged)} test durations')
           "
 
-      # Save the merged durations for future runs (save-only)
+      # Save the merged durations for future runs (save-only). Save them even when tests failed:
+      # a failed test's timing is still valid, and with this many hosts some download is usually down.
       - name: Save merged pytest-split durations cache
-        if: needs.Test.result == 'success'
         uses: actions/cache/save@v4
         with:
           path: .test_durations
-          key: pytest-split-${{ runner.os }}-py310-${{ github.run_id }}
+          key: pytest-split-${{ runner.os }}-py310-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Combine coverage and generate reports
         run: |
