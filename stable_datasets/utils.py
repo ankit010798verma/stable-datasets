@@ -819,28 +819,28 @@ def load_from_tsfile_to_dataframe(
     replace_missing_vals_with="NaN",
 ):
     """Load data from a .ts file into a Pandas DataFrame.
+
     Credit to https://github.com/sktime/sktime/blob/7d572796ec519c35d30f482f2020c3e0256dd451/sktime/datasets/_data_io.py#L379
+
     Parameters
     ----------
-    full_file_path_and_name: str
+    full_file_path_and_name : str
         The full pathname of the .ts file to read.
-    return_separate_X_and_y: bool
-        true if X and Y values should be returned as separate Data Frames (
-        X) and a numpy array (y), false otherwise.
-        This is only relevant for data that
-    replace_missing_vals_with: str
-       The value that missing values in the text file should be replaced
-       with prior to parsing.
+    return_separate_X_and_y : bool
+        True to return the time series (a DataFrame, X) and the class values
+        (a numpy array, y) separately, False to return them in one DataFrame.
+        Only relevant when the file has class labels.
+    replace_missing_vals_with : str
+        The value that missing values in the text file should be replaced
+        with prior to parsing.
+
     Returns
     -------
-    DataFrame (default) or ndarray (i
-        If return_separate_X_and_y then a tuple containing a DataFrame and a
-        numpy array containing the relevant time-series and corresponding
-        class values.
-    DataFrame
-        If not return_separate_X_and_y then a single DataFrame containing
-        all time-series and (if relevant) a column "class_vals" the
-        associated class values.
+    tuple of (DataFrame, ndarray), or DataFrame
+        If the file has class labels and *return_separate_X_and_y* is True, a
+        DataFrame of the time series and a numpy array of the class values.
+        Otherwise a single DataFrame of all time series, with a "class_vals"
+        column holding the class values if the file has them.
     """
     # Initialize flags and variables used when parsing the file
     metadata_started = False
