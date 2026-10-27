@@ -71,7 +71,7 @@ Available Datasets
    face_pointing
    rock_paper_scissor
    linnaeus5
-   chest_xray
+   breakhis
    patternnet
 
 .. toctree::

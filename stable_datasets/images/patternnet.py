@@ -62,10 +62,10 @@ class PatternNet(BaseDatasetBuilder):
     The dataset contains 38 classes with 800 images per class (30,400 images total).
     Each image is 256x256 pixels in RGB format.
 
-    Splits:
-    - Standard 80/20 train/test split:
-      - train: 24,320 images (640 per class)
-      - test: 6,080 images (160 per class)
+    Splits (standard 80/20 train/test split):
+
+    - train: 24,320 images (640 per class)
+    - test: 6,080 images (160 per class)
     """
 
     VERSION = Version("1.0.0")
@@ -162,8 +162,11 @@ class PatternNet(BaseDatasetBuilder):
                     pil_rgb.save(buf, format="JPEG")
                     processed_bytes = buf.getvalue()
 
-                yield yield_idx, {
-                    "image": processed_bytes,
-                    "label": label,
-                }
+                yield (
+                    yield_idx,
+                    {
+                        "image": processed_bytes,
+                        "label": label,
+                    },
+                )
                 yield_idx += 1

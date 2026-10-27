@@ -169,11 +169,11 @@ DATASET_CONFIGS: dict[str, DatasetConfig] = {
         std=[0.2731, 0.2659, 0.2797],
     ),
     "imagenet100": _rgb("imagenet100", "ImageNet-100", 100, builder_name="ImageNet100"),
-    "chestxray": _rgb(
-        "chestxray",
-        "Chest X-Ray",
-        2,
-        builder_name="ChestXRay",
+    "breakhis": _rgb(
+        "breakhis",
+        "BreakHis",
+        8,
+        builder_name="BreakHis",
     ),
     "patternnet": _rgb(
         "patternnet",

@@ -45,4 +45,6 @@ def test_patternnet_dataset():
     ds_torch = ds_test.with_format("torch")
     torch_sample = ds_torch[0]
     assert "image" in torch_sample
-    assert torch_sample["image"].shape == (3, 256, 256), f"Expected (3, 256, 256) tensor, got {torch_sample['image'].shape}."
+    assert torch_sample["image"].shape == (3, 256, 256), (
+        f"Expected (3, 256, 256) tensor, got {torch_sample['image'].shape}."
+    )
