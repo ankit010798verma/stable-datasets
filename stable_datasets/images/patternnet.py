@@ -1,11 +1,21 @@
 import re
-
-import pyarrow.parquet as pq
+import zipfile
 
 from stable_datasets.schema import ClassLabel, DatasetInfo, DatasetSource, DownloadInfo, Features, Version
 from stable_datasets.schema import Image as ImageFeature
-from stable_datasets.splits import Split, SplitGenerator
-from stable_datasets.utils import BaseDatasetBuilder, bulk_download
+from stable_datasets.utils import BaseDatasetBuilder
+
+
+# The authors' release, linked from the homepage.
+_URL = (
+    "https://nuisteducn1-my.sharepoint.com/:u:/g/personal/zhouwx_nuist_edu_cn/"
+    "EYSPYqBztbBBqS27B7uM_mEB3R9maNJze8M1Qg9Q6cnPBQ?e=MSf977&download=1"
+)
+_DOWNLOAD = DownloadInfo(
+    url=_URL,
+    checksum="sha256:456dd031950b0429518b8ec7d30a5c4b3f6456261ee1dd573a3eee43efb29958",
+    filename="PatternNet.zip",
+)
 
 
 CLASS_NAMES = [
@@ -52,7 +62,7 @@ CLASS_NAMES = [
 # Each class has images numbered 001-800; this builder puts 001-640 in train and 641-800 in test.
 TRAIN_IMAGES_PER_CLASS = 640
 
-_FILE_NUMBER_RE = re.compile(r"(\d+)\.jpg$")
+_IMAGE_RE = re.compile(r"^PatternNet/images/(?P<class_dir>[a-z_]+)/[a-z_]+(?P<number>\d+)\.jpg$")
 
 
 class PatternNet(BaseDatasetBuilder):
@@ -77,12 +87,7 @@ class PatternNet(BaseDatasetBuilder):
 
     SOURCE = DatasetSource(
         homepage="https://sites.google.com/view/zhouwx/dataset",
-        assets={
-            f"train_{i}": DownloadInfo(
-                url=f"https://huggingface.co/datasets/blanchon/PatternNet/resolve/main/data/train-{i:05d}-of-00003.parquet",
-            )
-            for i in range(3)
-        },
+        assets={"train": _DOWNLOAD, "test": _DOWNLOAD},
         citation="""@article{zhou2018patternnet,
             title={PatternNet: A benchmark dataset for performance evaluation of remote sensing image retrieval},
             author={Zhou, Weixun and Newsam, Shawn and Li, Congmin and Shao, Zhenfeng},
@@ -112,29 +117,12 @@ class PatternNet(BaseDatasetBuilder):
             citation=self.SOURCE["citation"],
         )
 
-    def _candidate_splits(self) -> list:
-        return [Split.TRAIN, Split.TEST]
-
-    def _split_generators(self):
-        source = self._source()
-        assets = source["assets"]
-        asset_keys = list(assets.keys())
-        downloaded = bulk_download([assets[k] for k in asset_keys], dest_folder=self._raw_download_dir)
-        paths = dict(zip(asset_keys, downloaded))
-        parquet_paths = [paths[f"train_{i}"] for i in range(3)]
-
-        return [
-            SplitGenerator(name=Split.TRAIN, gen_kwargs={"data_paths": parquet_paths, "split": "train"}),
-            SplitGenerator(name=Split.TEST, gen_kwargs={"data_paths": parquet_paths, "split": "test"}),
-        ]
-
-    def _generate_examples(self, data_paths, split):
+    def _generate_examples(self, data_path, split):
         """Yield the source JPEG bytes unchanged, keeping images 001-640 of each class for train and the rest for test."""
-        yield_idx = 0
-        for path in data_paths:
-            for row in pq.read_table(path).to_pylist():
-                file_number = int(_FILE_NUMBER_RE.search(row["image"]["path"]).group(1))
-                if (file_number <= TRAIN_IMAGES_PER_CLASS) != (split == "train"):
+        with zipfile.ZipFile(data_path) as archive:
+            for name in sorted(archive.namelist()):
+                match = _IMAGE_RE.match(name)
+                if match is None or (int(match["number"]) <= TRAIN_IMAGES_PER_CLASS) != (split == "train"):
                     continue
-                yield yield_idx, {"image": row["image"]["bytes"], "label": int(row["label"])}
-                yield_idx += 1
+                label = CLASS_NAMES.index(match["class_dir"].replace("_", " "))
+                yield name, {"image": archive.read(name), "label": label}

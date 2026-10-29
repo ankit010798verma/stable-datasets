@@ -16,6 +16,8 @@ PatternNet is a large-scale, high-resolution remote sensing benchmark dataset co
 
 - **Total Images**: 30,400 images (38 classes, 800 images per class)
 - **Resolution**: 256×256 pixels, RGB (stored as the original JPEGs)
+- **Source**: the authors' release (``PatternNet.zip``, 1.4 GB), linked from the homepage
+- **License**: not stated on the homepage; cite the original paper when using the data
 
 PatternNet has no official train/test split, so stable-datasets uses its own fixed 80/20 split of each class, by the number in the image file names (``airplane001.jpg`` to ``airplane800.jpg``):
 
