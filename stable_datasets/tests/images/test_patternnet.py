@@ -1,5 +1,6 @@
+from collections import Counter
+
 import numpy as np
-import pytest
 from PIL import Image
 
 from stable_datasets.images import PatternNet
@@ -22,11 +23,17 @@ def test_patternnet_info():
     assert builder.SOURCE["homepage"] == "https://sites.google.com/view/zhouwx/dataset"
 
 
-@pytest.mark.large
 def test_patternnet_dataset():
-    """Download and test loading of PatternNet test split."""
+    """Download PatternNet and check split sizes, per-class counts, and sample format."""
+    ds_train = PatternNet(split="train")
     ds_test = PatternNet(split="test")
+    assert len(ds_train) == 24320, f"Expected 24320 train samples, got {len(ds_train)}."
     assert len(ds_test) == 6080, f"Expected 6080 test samples, got {len(ds_test)}."
+
+    train_counts = Counter(ds_train.table.column("label").to_pylist())
+    test_counts = Counter(ds_test.table.column("label").to_pylist())
+    assert train_counts == dict.fromkeys(range(38), 640), f"Expected 640 train images per class, got {train_counts}."
+    assert test_counts == dict.fromkeys(range(38), 160), f"Expected 160 test images per class, got {test_counts}."
 
     sample = ds_test[0]
     expected_keys = {"image", "label"}
@@ -34,6 +41,7 @@ def test_patternnet_dataset():
 
     img = sample["image"]
     assert isinstance(img, Image.Image), f"Expected PIL Image, got {type(img)}."
+    assert img.format == "JPEG", f"Expected the source JPEG to be stored unchanged, got {img.format}."
     img_np = np.array(img)
     assert img_np.shape == (256, 256, 3), f"Expected shape (256, 256, 3), got {img_np.shape}."
     assert img_np.dtype == np.uint8, f"Expected uint8 dtype, got {img_np.dtype}."

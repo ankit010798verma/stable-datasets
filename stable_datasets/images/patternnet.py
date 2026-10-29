@@ -1,12 +1,11 @@
-import io
+import re
 
 import pyarrow.parquet as pq
-from PIL import Image as PILImage
 
 from stable_datasets.schema import ClassLabel, DatasetInfo, DatasetSource, DownloadInfo, Features, Version
 from stable_datasets.schema import Image as ImageFeature
 from stable_datasets.splits import Split, SplitGenerator
-from stable_datasets.utils import BaseDatasetBuilder, _default_dest_folder, bulk_download
+from stable_datasets.utils import BaseDatasetBuilder, bulk_download
 
 
 CLASS_NAMES = [
@@ -50,6 +49,11 @@ CLASS_NAMES = [
     "wastewater treatment plant",
 ]
 
+# Each class has images numbered 001-800; this builder puts 001-640 in train and 641-800 in test.
+TRAIN_IMAGES_PER_CLASS = 640
+
+_FILE_NUMBER_RE = re.compile(r"(\d+)\.jpg$")
+
 
 class PatternNet(BaseDatasetBuilder):
     """
@@ -62,10 +66,11 @@ class PatternNet(BaseDatasetBuilder):
     The dataset contains 38 classes with 800 images per class (30,400 images total).
     Each image is 256x256 pixels in RGB format.
 
-    Splits (standard 80/20 train/test split):
+    PatternNet has no official split. This builder splits each class by the
+    number in its file names (e.g. ``airplane001.jpg``):
 
-    - train: 24,320 images (640 per class)
-    - test: 6,080 images (160 per class)
+    - train: images 001-640 of each class, 24,320 images
+    - test: images 641-800 of each class, 6,080 images
     """
 
     VERSION = Version("1.0.0")
@@ -87,7 +92,6 @@ class PatternNet(BaseDatasetBuilder):
             year={2018},
             publisher={Elsevier}
         }""",
-        license="Open Access for Research",
     )
 
     def _info(self):
@@ -95,7 +99,7 @@ class PatternNet(BaseDatasetBuilder):
             description=(
                 "PatternNet is a large-scale high-resolution remote sensing image dataset "
                 "consisting of 30,400 RGB images across 38 classes (800 images per class, "
-                "256x256 resolution). Partitioned into an 80/20 train/test split."
+                "256x256 resolution), split 80/20 per class by image number into train and test."
             ),
             features=Features(
                 {
@@ -106,7 +110,6 @@ class PatternNet(BaseDatasetBuilder):
             supervised_keys=("image", "label"),
             homepage=self.SOURCE["homepage"],
             citation=self.SOURCE["citation"],
-            license=self.SOURCE["license"],
         )
 
     def _candidate_splits(self) -> list:
@@ -115,12 +118,8 @@ class PatternNet(BaseDatasetBuilder):
     def _split_generators(self):
         source = self._source()
         assets = source["assets"]
-        download_dir = getattr(self, "_raw_download_dir", None)
-        if download_dir is None:
-            download_dir = _default_dest_folder()
-
         asset_keys = list(assets.keys())
-        downloaded = bulk_download([assets[k] for k in asset_keys], dest_folder=download_dir)
+        downloaded = bulk_download([assets[k] for k in asset_keys], dest_folder=self._raw_download_dir)
         paths = dict(zip(asset_keys, downloaded))
         parquet_paths = [paths[f"train_{i}"] for i in range(3)]
 
@@ -129,44 +128,13 @@ class PatternNet(BaseDatasetBuilder):
             SplitGenerator(name=Split.TEST, gen_kwargs={"data_paths": parquet_paths, "split": "test"}),
         ]
 
-    def _generate_examples(self, data_paths, split: str = "train", **kwargs):
-        """Generate examples from Apache Parquet files with deterministic 80/20 train/test partition."""
-        if isinstance(data_paths, str):
-            data_paths = [data_paths]
-
-        class_counters = [0] * len(CLASS_NAMES)
+    def _generate_examples(self, data_paths, split):
+        """Yield the source JPEG bytes unchanged, keeping images 001-640 of each class for train and the rest for test."""
         yield_idx = 0
-
         for path in data_paths:
-            table = pq.read_table(path)
-            for row in table.to_pylist():
-                label = int(row["label"])
-                count_in_class = class_counters[label]
-                class_counters[label] += 1
-
-                is_train = count_in_class < 640
-                if (split == "train" and not is_train) or (split == "test" and is_train):
+            for row in pq.read_table(path).to_pylist():
+                file_number = int(_FILE_NUMBER_RE.search(row["image"]["path"]).group(1))
+                if (file_number <= TRAIN_IMAGES_PER_CLASS) != (split == "train"):
                     continue
-
-                img_data = row["image"]
-                if isinstance(img_data, dict) and "bytes" in img_data:
-                    raw_bytes = img_data["bytes"]
-                elif isinstance(img_data, bytes):
-                    raw_bytes = img_data
-                else:
-                    raise ValueError(f"Unexpected image format: {type(img_data)}")
-
-                with PILImage.open(io.BytesIO(raw_bytes)) as pil_img:
-                    pil_rgb = pil_img.convert("RGB")
-                    buf = io.BytesIO()
-                    pil_rgb.save(buf, format="JPEG")
-                    processed_bytes = buf.getvalue()
-
-                yield (
-                    yield_idx,
-                    {
-                        "image": processed_bytes,
-                        "label": label,
-                    },
-                )
+                yield yield_idx, {"image": row["image"]["bytes"], "label": int(row["label"])}
                 yield_idx += 1

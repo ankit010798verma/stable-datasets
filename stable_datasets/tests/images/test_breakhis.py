@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 from PIL import Image
 
 from stable_datasets.images.breakhis import _IMAGE_RE, MAGNIFICATIONS, TEST_PATIENTS, TUMOR_TYPES, BreakHis
@@ -37,7 +36,6 @@ def test_breakhis_path_parsing():
     assert len(TEST_PATIENTS) == 22
 
 
-@pytest.mark.large
 def test_breakhis_dataset():
     """Download BreakHis and check split sizes, sample format, and that no patient is in both splits."""
     ds_train = BreakHis(split="train")

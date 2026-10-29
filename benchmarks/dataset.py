@@ -61,7 +61,6 @@ def _image(
     std,
     builder_name=None,
     builder_kwargs=None,
-    label_key="label",
     include_in_results=True,
 ):
     return DatasetConfig(
@@ -73,7 +72,6 @@ def _image(
         std=std,
         builder_name=builder_name,
         builder_kwargs=dict(builder_kwargs or {}),
-        label_key=label_key,
         num_channels=channels,
         include_in_results=include_in_results,
     )
@@ -171,25 +169,6 @@ DATASET_CONFIGS: dict[str, DatasetConfig] = {
         std=[0.2731, 0.2659, 0.2797],
     ),
     "imagenet100": _rgb("imagenet100", "ImageNet-100", 100, builder_name="ImageNet100"),
-    "breakhis": _rgb(
-        "breakhis",
-        "BreakHis",
-        8,
-        builder_name="BreakHis",
-    ),
-    "breakhis_binary": _rgb(
-        "breakhis_binary",
-        "BreakHis (benign vs. malignant)",
-        2,
-        builder_name="BreakHis",
-        label_key="malignant",
-    ),
-    "patternnet": _rgb(
-        "patternnet",
-        "PatternNet",
-        38,
-        builder_name="PatternNet",
-    ),
     # Grayscale datasets (1-channel) — includes character/line-art datasets
     # whose images are visually binary (ink-on-paper) regardless of source channel count.
     "arabiccharacters": _gray("arabiccharacters", "Arabic Characters", 28, mean=[0.1030], std=[0.3040]),
@@ -544,12 +523,6 @@ def create_dataset(
         splits = train_hf.train_test_split(test_size=0.1, seed=42)
         train_hf = splits["train"]
         val_hf = splits["test"]
-
-    # Image transforms and collation read "label", so train on another column by renaming it.
-    if ds_config.modality != "timeseries" and ds_config.label_key != "label":
-        train_hf, val_hf = (
-            ds.remove_columns("label").rename_column(ds_config.label_key, "label") for ds in (train_hf, val_hf)
-        )
 
     batch_size = training_cfg.batch_size
     num_workers = training_cfg.num_workers

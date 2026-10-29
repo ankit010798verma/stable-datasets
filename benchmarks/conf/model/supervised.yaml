@@ -137,15 +137,6 @@ params:
   fgvcaircraft_manufacturer:
     batch_size: 256
     max_epochs: 300
-  breakhis:
-    batch_size: 128
-    max_epochs: 100
-  breakhis_binary:
-    batch_size: 128
-    max_epochs: 100
-  patternnet:
-    batch_size: 128
-    max_epochs: 100
 
 vit_optimizer:
   type: AdamW

@@ -15,9 +15,12 @@ Overview
 PatternNet is a large-scale, high-resolution remote sensing benchmark dataset collected from Google Earth and Google Maps imagery across various cities in the United States. It was established for evaluating remote sensing image retrieval and scene classification algorithms.
 
 - **Total Images**: 30,400 images (38 classes, 800 images per class)
-- **Resolution**: 256×256 pixels, RGB
-- **Train Split**: 24,320 images (80%, 640 per class)
-- **Test Split**: 6,080 images (20%, 160 per class)
+- **Resolution**: 256×256 pixels, RGB (stored as the original JPEGs)
+
+PatternNet has no official train/test split, so stable-datasets uses its own fixed 80/20 split of each class, by the number in the image file names (``airplane001.jpg`` to ``airplane800.jpg``):
+
+- **Train Split**: 24,320 images (images 001-640 of each class)
+- **Test Split**: 6,080 images (images 641-800 of each class)
 
 .. figure:: teasers/patternnet_teaser.png
    :align: center
